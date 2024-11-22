@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quản lý Cafe</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; text-align: left; border: 1px solid #ddd; }
+        th { background-color: #4CAF50; color: white; }
+        .actions { display: flex; gap: 5px; }
+        button { padding: 5px 10px; cursor: pointer; }
+        .add-btn { background-color: #4CAF50; color: white; border: none; padding: 10px; }
+        .edit-btn { background-color: #2196F3; color: white; border: none; }
+        .delete-btn { background-color: #f44336; color: white; border: none; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: white; margin: 15% auto; padding: 20px;
+                        width: 70%; max-width: 500px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group input { width: 100%; padding: 8px; }
+        .price { white-space: nowrap; } /* Giữ đơn giá và đơn vị trên cùng một dòng */
+        .price-input-group { position: relative; }
+        .price-input-group input { padding-left: 20px; }
+        .price-input-group::before { 
+            content: '$';
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+    </style>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Quản lý Cafe</h1>
+        <button onclick="logout()" style="padding: 10px;">Đăng xuất</button>
+    </div>
+    
+    <button class="add-btn" onclick="openAddModal()">Thêm mới</button>
+    
+    <table id="cafeTable">
+        <thead>
+            <tr>
+                <th>Tên cafe</th>
+                <th>Xuất xứ</th>
+                <th>Đơn giá ($)</th>
+                <th>Số lượng</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <!-- Modal form -->
+    <div id="cafeModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Thêm/Sửa Cafe</h2>
+            <form id="cafeForm">
+                <div class="form-group">
+                    <label>Tên cafe:</label>
+                    <input type="text" id="ten_cafe" required>
+                </div>
+                <div class="form-group">
+                    <label>Xuất xứ:</label>
+                    <input type="text" id="xuat_xu" required>
+                </div>
+                <div class="form-group">
+                    <label>Đơn giá ($):</label>
+                    <div class="price-input-group">
+                        <input type="number" id="don_gia" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Số lượng:</label>
+                    <input type="number" id="so_luong" min="0" required>
+                </div>
+                <button type="submit">Lưu</button>
+                <button type="button" onclick="closeModal()">Hủy</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentId = null;
+
+        // Format số tiền với 2 chữ số thập phân và ký hiệu đô la
+        function formatPrice(price) {
+            return `$${parseFloat(price).toFixed(2)}`;
+        }
+
+        function loadCafe() {
+            fetch('/api/cafe')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.querySelector('#cafeTable tbody');
+                    tbody.innerHTML = '';
+                    data.forEach(cafe => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${cafe.ten_cafe}</td>
+                                <td>${cafe.xuat_xu}</td>
+                                <td class="price">${formatPrice(cafe.don_gia)}</td>
+                                <td>${cafe.so_luong}</td>
+                                <td class="actions">
+                                    <button class="edit-btn" onclick="openEditModal(${cafe.id}, '${cafe.ten_cafe}', '${cafe.xuat_xu}', ${cafe.don_gia}, ${cafe.so_luong})">Sửa</button>
+                                    <button class="delete-btn" onclick="deleteCafe(${cafe.id})">Xóa</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                });
+        }
+
+        function openAddModal() {
+            currentId = null;
+            document.getElementById('modalTitle').textContent = 'Thêm Cafe';
+            document.getElementById('cafeForm').reset();
+            document.getElementById('cafeModal').style.display = 'block';
+        }
+
+        function openEditModal(id, ten_cafe, xuat_xu, don_gia, so_luong) {
+            currentId = id;
+            document.getElementById('modalTitle').textContent = 'Sửa Cafe';
+            document.getElementById('ten_cafe').value = ten_cafe;
+            document.getElementById('xuat_xu').value = xuat_xu;
+            document.getElementById('don_gia').value = don_gia.toFixed(2);
+            document.getElementById('so_luong').value = so_luong;
+            document.getElementById('cafeModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('cafeModal').style.display = 'none';
+        }
+
+        document.getElementById('cafeForm').onsubmit = function(e) {
+            e.preventDefault();
+            const cafeData = {
+                ten_cafe: document.getElementById('ten_cafe').value,
+                xuat_xu: document.getElementById('xuat_xu').value,
+                don_gia: parseFloat(document.getElementById('don_gia').value),
+                so_luong: parseInt(document.getElementById('so_luong').value)
+            };
+
+            const url = currentId ? `/api/cafe/${currentId}` : '/api/cafe';
+            const method = currentId ? 'PUT' : 'POST';
+
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(cafeData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                closeModal();
+                loadCafe();
+            });
+        };
+
+        function deleteCafe(id) {
+            if (confirm('Bạn có chắc muốn xóa?')) {
+                fetch(`/api/cafe/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loadCafe();
+                });
+            }
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        // Load data when page loads
+        loadCafe();
+    </script>
+</body>
+</html>
